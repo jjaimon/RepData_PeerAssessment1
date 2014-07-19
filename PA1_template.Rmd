@@ -1,20 +1,100 @@
-# Reproducible Research: Peer Assessment 1
 
+# Reproducible Research: Peer Assignment 1
+### Jaimon Jose
+**_19 July 2014_**
 
-## Loading and preprocessing the data
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a [Fitbit][1], [Nike Fuelband][2], or [Jawbone Up][3]. These type of devices are part of the "quantified self" movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
 
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
+## Loading and preprocessing data
+```{r}
+activity.df <- read.csv("activity.csv")
+# Convert column date to type "date"
+activity.df <- transform(activity.df, date = as.Date(date))
+```
+
+What is the percentage of NA in the dataset?
+```{r}
+mean(is.na(activity.df$steps))
+```
+
+Summarize the data.
+```{r echo=FALSE}
+summary(activity.df)
+```
 
 ## What is mean total number of steps taken per day?
+To compute the total number of steps taken per day, summarize the data daywise first.
+```{r}
+daywise.df <- aggregate(steps ~ date, data = activity.df, sum)
+head(daywise.df)
 
+# Draw a histogram that shows total number of steps taken each day
+library("ggplot2")
+ggplot(daywise.df, aes(x=steps)) + geom_histogram(binwidth=750)
+
+# Compute the mean and median total number of steps taken.
+# Community TA suggested in the forum that the actual intent is to 
+# calculate and report the mean and median of total number of steps 
+# taken per day
+library("plyr")
+ddply(daywise.df, .(date), summarize, Mean = round(mean(steps, na.rm=TRUE), 2), Median = median(steps, na.rm=TRUE))
+```
 
 
 ## What is the average daily activity pattern?
+Subset the data in a 5 second interval and compute the daily average for each of those intervals.
 
+```{r}
+daily.avg.df <- ddply(activity.df, .(interval), summarize, mean = mean(steps, na.rm=TRUE))
+ggplot(daily.avg.df, aes(interval, mean)) + geom_line() + ylab("Mean") + xlab("Interval")
 
+# Find out the 5-min interval that contains maximum number of steps
+head(arrange(daily.avg.df, desc(mean)))
+```
+
+```{r, echo=FALSE}
+x <- arrange(daily.avg.df, desc(mean))[1,1]
+```
+Its shown in the above table that `r x` is the interval with maximum number of steps
 
 ## Imputing missing values
+Compute the percentage of NAs in the dataset
+```{r}
+# Number of rows with complete data
+nrow(activity.df[complete.cases(activity.df), ])
+
+# number of rows with missing data
+sum(is.na(activity.df))
+
+# Impute the data with daily mean
+data.imp.df = transform(activity.df, steps = ifelse(is.na(steps), mean(steps, na.rm=TRUE), steps))
+data.imp.df <- aggregate(steps ~ date, data = data.imp.df, sum)
+
+# Compute the mean and median of total number of steps taken per day
+ddply(data.imp.df, .(date), summarize, Mean = round(mean(steps, na.rm=TRUE), 2), Median = median(steps, na.rm=TRUE))
 
 
+# Histogram of the imputed data
+ggplot(data.imp.df, aes(x=steps)) + geom_histogram(binwidth=750)
+
+```
+The above table shows that there is not much difference between the mean and median of the imputed data from the original except that additional rows are present as there are no NAs in the dataset now
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+# Add a column to indicate the day of the week
+weekday.df <- transform(activity.df, weekday = as.factor(weekdays(activity.df$date)))
+# Convert the column day of the week to "weekend" or "weekday"
+weekday.df <- transform(weekday.df, weekday = as.factor(ifelse(weekday.df$weekday %in% c("Saturday", "Sunday"), "weekend", "weekday"))) 
+
+# Preparation for the plot
+weekday.avg.df <- ddply(weekday.df, .(interval, weekday), summarize, mean = mean(steps, na.rm=TRUE))
+ggplot(weekday.avg.df, aes(interval, mean)) + geom_line(aes(color=weekday)) + ylab("Number of steps") + xlab("Interval") + facet_grid( weekday ~ .)
+```
+
+
+[1]: http://fitbit.com "Fitbit"
+[2]: http://www.nike.com/us/en_us/c/nikeplus-fuelband "Nike Fuelband"
+[3]: https://jawbone.com/up "A fitter you"
